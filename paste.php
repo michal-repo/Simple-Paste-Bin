@@ -1,3 +1,7 @@
+<?php
+$db_location = "/home/pi/pastebin_db";
+?>
+
 <html>
 
 <head>
@@ -17,12 +21,28 @@
 create table saved_notes (id int(11) NOT NULL AUTO_INCREMENT,note text NOT NULL,date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, filename varchar(255),PRIMARY KEY (id)) ENGINE=InnoDB;
 */
 
+/*
+CREATE TABLE `saved_notes` (`id` integer NOT NULL PRIMARY KEY AUTOINCREMENT,  `note` text NOT NULL,  `date` timestamp NOT NULL DEFAULT current_timestamp,  `filename` varchar(255) DEFAULT NULL);
+*/
+
+// SQLITE
+try {
+	$initDB = false;
+	if (!is_file((isset($db_location) ? $db_location : __DIR__) . "/pastebin.db")) {
+		$connection = new PDO("sqlite:" . $db_location . "/pastebin.db");
+		$stmt = $connection->prepare("CREATE TABLE saved_notes (id integer NOT NULL PRIMARY KEY AUTOINCREMENT,  note text NOT NULL,  date timestamp NOT NULL DEFAULT current_timestamp,  filename varchar(255) DEFAULT NULL)");
+		$stmt->execute();
+	}
+} catch (Exception $e) {
+	echo "Unable to connect to local database.<br>" . $e->getMessage();
+}
+
 //DATABASE
-$db_user = 'paste';
-$db_pass = 'password';
+// $db_user = 'paste';
+// $db_pass = 'password';
 try {
 	#$connection = new PDO("mysql:dbname=pastebin;host=localhost", $db_user, $db_pass);
-	$connection = new PDO("sqlite:/home/pi/pastebin_db/pastebin.db");
+	$connection = new PDO("sqlite:" . $db_location . "/pastebin.db");
 } catch (Exception $e) {
 	echo 'Caught exception: ',  $e->getMessage(), "\n";
 	die;
