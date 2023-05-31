@@ -1,5 +1,5 @@
 <?php
-$db_location = "/home/pi/pastebin_db";
+$db_location = ".";
 ?>
 
 <html>
