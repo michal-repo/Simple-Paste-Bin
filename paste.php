@@ -156,7 +156,7 @@ if (isset($_GET['id'])) {
 							echo "Select file to upload (max 20MB):";
 						} ?>
 					</label>
-					<input class="form-control-file" type="file" name="fileToUpload" id="fileToUpload">
+					<input class="form-control-file" type="file" name="fileToUpload" id="fileToUpload" style="max-width:25%;background-color:LightCyan;">
 				</form>
 				<?php if (isset($file_upload_result)) echo "<h6>" . $file_upload_result . "</h6>"; ?>
 				<?php if (isset($saved_note['filename'])) echo "<a target='blank' href=" . $saved_note['filename'] . ">Download file - " . $saved_note['filename'] . "</a>"; ?>
@@ -165,7 +165,7 @@ if (isset($_GET['id'])) {
 		<div class="row">
 			<div class="col-lg">
 				<?php if (isset($saved_note['id'])) { ?>
-					<form action="" method="POST" id="remove_note" name="remove_note">
+					<form action="" method="POST" id="remove_note" name="remove_note" onsubmit="return confirm('Do you really want to delete this note?');">
 						<input type="hidden" name="remove" id="remove" value="<?php echo $saved_note['id']; ?>">
 					</form>
 				<?php } ?>
