@@ -12,25 +12,17 @@ $db_location = "/home/pi/pastebin_db";
 	<title>Paste Bin</title>
 
 	<link rel="icon" href="paste.ico" />
-	<link rel="stylesheet" href="bootstrap-4.4.1-dist/css/bootstrap.min.css">
-	<script src="bootstrap-4.4.1-dist/js/bootstrap.min.js"></script>
+	<link rel="stylesheet" href="bootstrap-5.2.2-dist/css/bootstrap.min.css">
+	<script src="bootstrap-5.2.2-dist/js/bootstrap.min.js"></script>
 </head>
 <?php
-
-/*
-create table saved_notes (id int(11) NOT NULL AUTO_INCREMENT,note text NOT NULL,date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, filename varchar(255),PRIMARY KEY (id)) ENGINE=InnoDB;
-*/
-
-/*
-CREATE TABLE `saved_notes` (`id` integer NOT NULL PRIMARY KEY AUTOINCREMENT,  `note` text NOT NULL,  `date` timestamp NOT NULL DEFAULT current_timestamp,  `filename` varchar(255) DEFAULT NULL);
-*/
 
 // SQLITE
 try {
 	$initDB = false;
 	if (!is_file((isset($db_location) ? $db_location : __DIR__) . "/pastebin.db")) {
 		$connection = new PDO("sqlite:" . $db_location . "/pastebin.db");
-		$stmt = $connection->prepare("CREATE TABLE saved_notes (id integer NOT NULL PRIMARY KEY AUTOINCREMENT,  note text NOT NULL,  date timestamp NOT NULL DEFAULT current_timestamp,  filename varchar(255) DEFAULT NULL)");
+		$stmt = $connection->prepare("CREATE TABLE saved_notes (id integer NOT NULL PRIMARY KEY AUTOINCREMENT,  note text NOT NULL,  date timestamp NOT NULL DEFAULT current_timestamp,  filename varchar(255) DEFAULT NULL, pinned INTEGER DEFAULT 0 NOT NULL)");
 		$stmt->execute();
 	}
 } catch (Exception $e) {
@@ -38,10 +30,7 @@ try {
 }
 
 //DATABASE
-// $db_user = 'paste';
-// $db_pass = 'password';
 try {
-	#$connection = new PDO("mysql:dbname=pastebin;host=localhost", $db_user, $db_pass);
 	$connection = new PDO("sqlite:" . $db_location . "/pastebin.db");
 } catch (Exception $e) {
 	echo 'Caught exception: ',  $e->getMessage(), "\n";
@@ -52,8 +41,9 @@ try {
 function getNoteFromDB($id)
 {
 	global $connection;
-	$sth = $connection->prepare("SELECT * FROM saved_notes where id=?");
-	$sth->execute(array($id));
+	$sth = $connection->prepare("SELECT * FROM saved_notes where id=:id");
+	$sth->bindValue(':id', $id);
+	$sth->execute();
 	return $sth->fetch(PDO::FETCH_ASSOC);
 }
 
@@ -70,21 +60,31 @@ function removeFile($name)
 }
 
 if (isset($_POST['note']) && isset($_POST['id'])) {
-	$stmt = $connection->prepare('update saved_notes set note=? where id=?');
-	$stmt->execute(array($_POST['note'], $_POST['id']));
+	$stmt = $connection->prepare('update saved_notes set note=:note where id=:id');
+	$stmt->bindValue(':note', $_POST['note']);
+	$stmt->bindValue(':id', $_POST['id']);
+	$stmt->execute();
 	$redirect = $_POST['id'];
 } elseif (isset($_POST['note'])) {
-	$stmt = $connection->prepare('insert into saved_notes (note) values (?)');
-	$stmt->execute(array($_POST['note']));
+	$stmt = $connection->prepare('insert into saved_notes (note) values (:note)');
+	$stmt->bindValue(':note', $_POST['note']);
+	$stmt->execute();
 	$_POST['id'] = $connection->lastInsertId();
 	$redirect = $_POST['id'];
 } elseif (isset($_POST['remove'])) {
 	$note = getNoteFromDB($_POST['remove']);
 	removeFile($note['filename']);
-	$stmt = $connection->prepare('delete from saved_notes where id=?');
-	$stmt->execute(array($_POST['remove']));
+	$stmt = $connection->prepare('delete from saved_notes where id=:id');
+	$stmt->bindValue(':id', $_POST['remove']);
+	$stmt->execute();
 	header('Location: paste.php');
 	exit;
+} elseif (isset($_POST['pin_note']) && isset($_POST['pin_note_val'])) {
+	$stmt = $connection->prepare('update saved_notes set pinned=:pinned where id=:id');
+	$stmt->bindValue(':pinned', $_POST['pin_note_val']);
+	$stmt->bindValue(':id', $_POST['pin_note']);
+	$stmt->execute();
+	$redirect = $_POST['id'];
 }
 $file_upload_result = NULL;
 if (isset($_FILES['fileToUpload']['tmp_name']) && $_FILES['fileToUpload']['tmp_name'] !== '') {
@@ -115,8 +115,10 @@ if (isset($_FILES['fileToUpload']['tmp_name']) && $_FILES['fileToUpload']['tmp_n
 			$note = getNoteFromDB($_POST['id']);
 			$r = removeFile($note['filename']);
 			$file_upload_result .= "The file " . htmlspecialchars(basename($_FILES["fileToUpload"]["name"])) . " has been uploaded.";
-			$stmt = $connection->prepare('update saved_notes set filename=? where id=?');
-			$stmt->execute(array($target_file, $_POST['id']));
+			$stmt = $connection->prepare('update saved_notes set filename=:filename where id=:id');
+			$stmt->bindValue(':filename', $target_file);
+			$stmt->bindValue(':id', $_POST['id']);
+			$stmt->execute();
 		} else {
 			$file_upload_result .= "Sorry, there was an error uploading your file.";
 		}
@@ -168,6 +170,10 @@ if (isset($_GET['id'])) {
 					<form action="" method="POST" id="remove_note" name="remove_note" onsubmit="return confirm('Do you really want to delete this note?');">
 						<input type="hidden" name="remove" id="remove" value="<?php echo $saved_note['id']; ?>">
 					</form>
+					<form action="" method="POST" id="pin_note_form" name="pin_note_form">
+						<input type="hidden" name="pin_note" id="pin_note" value="<?php echo $saved_note['id']; ?>">
+						<input type="hidden" name="pin_note_val" id="pin_note_val" value="<?php echo ($saved_note['pinned'] === 1 ? "0" : "1"); ?>">
+					</form>
 				<?php } ?>
 			</div>
 		</div>
@@ -189,6 +195,13 @@ if (isset($_GET['id'])) {
 							<button type="submit" class="btn btn-danger" form="remove_note">Remove</button>
 						</div>
 						<div class="btn-group mr-2" role="group">
+							<?php if ($saved_note['pinned'] === 1) { ?>
+								<button type="submit" class="btn btn-secondary" form="pin_note_form">Unpin this note</button>
+							<?php } else { ?>
+								<button type="submit" class="btn btn-success" form="pin_note_form">Pin this note</button>
+							<?php } ?>
+						</div>
+						<div class="btn-group mr-2" role="group">
 							<a class="btn btn-info" href='paste.php'>New note</a>
 						</div>
 					<?php } ?>
@@ -198,26 +211,21 @@ if (isset($_GET['id'])) {
 		</div>
 		<div class="row">
 			<div class="col-lg">
-				<?php
+				<div class="list-group">
+					<?php
 
-				$sth = $connection->prepare("SELECT * FROM saved_notes order by date DESC");
-				$sth->execute();
-				$result = $sth->fetchAll(PDO::FETCH_ASSOC);
-				foreach ($result as $row) {
-				?>
-
-					<div class="list-group">
-						<?php
-						echo "<a href='?id=" . $row['id'] . "' class='list-group-item list-group-item-action' >" . $row['id'] . " - " . $row['date'] . " - " . substr($row['note'], 0, 60) . "</a>";
-						?>
-					</div>
-
-
-				<?php
-				}
-
-
-				?>
+					$sth = $connection->prepare("SELECT * FROM saved_notes order by pinned DESC, date DESC");
+					$sth->execute();
+					$result = $sth->fetchAll(PDO::FETCH_ASSOC);
+					foreach ($result as $row) {
+						echo "<a href='?id=" . $row['id']
+							. "' class='list-group-item list-group-item-action "
+							. ($row['pinned'] === 1 ? 'list-group-item-primary' : '') . " "
+							. ((isset($saved_note) && $saved_note['id'] === $row['id']) ? 'active' : '')
+							. "' >" . $row['id'] . " - " . $row['date'] . " - " . substr($row['note'], 0, 60) . "</a>";
+					}
+					?>
+				</div>
 			</div>
 		</div>
 	</div>
