@@ -140,30 +140,44 @@ if (isset($_GET['id'])) {
 
 <body style='width=70%'>
 	<div class="container-fluid">
-		<div class="row">
-			<div class="col-lg">
-				<form action="" method="POST" id="save" name="save" enctype="multipart/form-data">
-					<div class="form-group">
-						<textarea class="form-control" id="note" name="note" rows="<?php echo $form_textarea_rows; ?>" cols="50"><?php if (isset($saved_note['note'])) {
-																																		echo $saved_note['note'];
-																																	} ?></textarea><br>
-					</div>
-					<?php if (isset($saved_note['id'])) {
-						echo '<input type="hidden" name="id" id="id" value="' . $saved_note['id'] . '">';
-					} ?>
-					<label for="fileToUpload">
-						<?php if (isset($saved_note['filename'])) {
-							echo "Replace existing file with (max 20MB):";
-						} else {
-							echo "Select file to upload (max 20MB):";
+		<?php if (isset($_GET['view']) && $_GET['view'] === 'html') { ?>
+			<div class="row">
+				<div class="col-lg">
+					<p>
+						<?php if (isset($saved_note['note'])) {
+							echo str_replace("\r\n", "<br>", $saved_note['note']);
 						} ?>
-					</label>
-					<input class="form-control-file" type="file" name="fileToUpload" id="fileToUpload" style="max-width:25%;background-color:LightCyan;">
-				</form>
-				<?php if (isset($file_upload_result)) echo "<h6>" . $file_upload_result . "</h6>"; ?>
-				<?php if (isset($saved_note['filename'])) echo "<a target='blank' href=" . $saved_note['filename'] . ">Download file - " . $saved_note['filename'] . "</a>"; ?>
+					</p>
+				</div>
 			</div>
-		</div>
+
+
+		<?php } else { ?>
+			<div class="row">
+				<div class="col-lg">
+					<form action="" method="POST" id="save" name="save" enctype="multipart/form-data">
+						<div class="form-group">
+							<textarea class="form-control" id="note" name="note" rows="<?php echo $form_textarea_rows; ?>" cols="50"><?php if (isset($saved_note['note'])) {
+																																			echo $saved_note['note'];
+																																		} ?></textarea><br>
+						</div>
+						<?php if (isset($saved_note['id'])) {
+							echo '<input type="hidden" name="id" id="id" value="' . $saved_note['id'] . '">';
+						} ?>
+						<label for="fileToUpload">
+							<?php if (isset($saved_note['filename'])) {
+								echo "Replace existing file with (max 20MB):";
+							} else {
+								echo "Select file to upload (max 20MB):";
+							} ?>
+						</label>
+						<input class="form-control-file" type="file" name="fileToUpload" id="fileToUpload" style="max-width:25%;background-color:LightCyan;">
+					</form>
+					<?php if (isset($file_upload_result)) echo "<h6>" . $file_upload_result . "</h6>"; ?>
+					<?php if (isset($saved_note['filename'])) echo "<a target='blank' href=" . $saved_note['filename'] . ">Download file - " . $saved_note['filename'] . "</a>"; ?>
+				</div>
+			</div>
+		<?php } ?>
 		<div class="row">
 			<div class="col-lg">
 				<?php if (isset($saved_note['id'])) { ?>
@@ -187,47 +201,58 @@ if (isset($_GET['id'])) {
 		<div class="row">
 			<div class="col-lg">
 				<div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
-					<div class="btn-group mr-2" role="group">
+					<div class="btn-group me-2" role="group">
 						<button type="submit" class="btn btn-primary" form="save">Save</button>
 					</div>
 					<?php if (isset($saved_note['id'])) { ?>
-						<div class="btn-group mr-2" role="group">
+						<div class="btn-group me-2" role="group">
 							<button type="submit" class="btn btn-danger" form="remove_note">Remove</button>
 						</div>
-						<div class="btn-group mr-2" role="group">
+						<div class="btn-group me-2" role="group">
 							<?php if ($saved_note['pinned'] === 1) { ?>
 								<button type="submit" class="btn btn-secondary" form="pin_note_form">Unpin this note</button>
 							<?php } else { ?>
 								<button type="submit" class="btn btn-success" form="pin_note_form">Pin this note</button>
 							<?php } ?>
 						</div>
-						<div class="btn-group mr-2" role="group">
+						<div class="btn-group me-2" role="group">
 							<a class="btn btn-info" href='paste.php'>New note</a>
 						</div>
+						<?php if (isset($_GET['view']) && $_GET['view'] === 'html') { ?>
+							<div class="btn-group me-2" role="group">
+								<a class="btn btn-warning" href='paste.php?<?php echo "id=" . $saved_note['id'] . "&view=form"; ?>'>Go back to form</a>
+							</div>
+						<?php } else { ?>
+							<div class="btn-group me-2" role="group">
+								<a class="btn btn-warning" href='paste.php?<?php echo "id=" . $saved_note['id'] . "&view=html"; ?>'>View as HTML</a>
+							</div>
+						<?php } ?>
 					<?php } ?>
 				</div>
 				<br><br>
 			</div>
 		</div>
-		<div class="row">
-			<div class="col-lg">
-				<div class="list-group">
-					<?php
+		<?php if (!(isset($_GET['view']) && $_GET['view'] === 'html')) { ?>
+			<div class="row">
+				<div class="col-lg">
+					<div class="list-group">
+						<?php
 
-					$sth = $connection->prepare("SELECT * FROM saved_notes order by pinned DESC, date DESC");
-					$sth->execute();
-					$result = $sth->fetchAll(PDO::FETCH_ASSOC);
-					foreach ($result as $row) {
-						echo "<a href='?id=" . $row['id']
-							. "' class='list-group-item list-group-item-action "
-							. ($row['pinned'] === 1 ? 'list-group-item-primary' : '') . " "
-							. ((isset($saved_note) && $saved_note['id'] === $row['id']) ? 'active' : '')
-							. "' >" . $row['id'] . " - " . $row['date'] . " - " . substr($row['note'], 0, 60) . "</a>";
-					}
-					?>
+						$sth = $connection->prepare("SELECT * FROM saved_notes order by pinned DESC, date DESC");
+						$sth->execute();
+						$result = $sth->fetchAll(PDO::FETCH_ASSOC);
+						foreach ($result as $row) {
+							echo "<a href='?id=" . $row['id']
+								. "' class='list-group-item list-group-item-action "
+								. ($row['pinned'] === 1 ? 'list-group-item-primary' : '') . " "
+								. ((isset($saved_note) && $saved_note['id'] === $row['id']) ? 'active' : '')
+								. "' >" . $row['id'] . " - " . $row['date'] . " - " . substr($row['note'], 0, 60) . "</a>";
+						}
+						?>
+					</div>
 				</div>
 			</div>
-		</div>
+		<?php } ?>
 	</div>
 </body>
 <script>
