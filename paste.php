@@ -145,7 +145,7 @@ if (isset($_GET['id'])) {
 				<div class="col-lg">
 					<p>
 						<?php if (isset($saved_note['note'])) {
-							echo str_replace("\r\n", "<br>", $saved_note['note']);
+							echo str_replace("\r\n", "<br>", str_replace(">", "&gt;", str_replace("<", "&lt;", $saved_note['note'])));
 						} ?>
 					</p>
 				</div>
