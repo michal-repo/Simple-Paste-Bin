@@ -44,7 +44,7 @@ class SavedNoteModel extends BaseWithDB {
      * @return array|false The note data as an associative array, or false if not found or not owned by the user.
      */
     public function getNoteById(int $noteId, int $userId): array|false {
-        $sql = "SELECT id, user_id, note, note_title, created_at, updated_at
+        $sql = "SELECT id, user_id, note, note_title, created_at, updated_at, pinned
                 FROM saved_notes
                 WHERE id = :note_id AND user_id = :user_id";
         try {
@@ -66,10 +66,10 @@ class SavedNoteModel extends BaseWithDB {
      * @return array An array of notes (each as an associative array).
      */
     public function getNotesByUserId(int $userId): array {
-        $sql = "SELECT id, user_id, note, note_title, created_at, updated_at
+        $sql = "SELECT id, user_id, note, note_title, created_at, updated_at, pinned
                 FROM saved_notes
                 WHERE user_id = :user_id
-                ORDER BY updated_at DESC"; // Or created_at, depending on desired order
+                ORDER BY pinned DESC, created_at DESC";
         try {
             $stmt = $this->db->dbh->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -128,6 +128,30 @@ class SavedNoteModel extends BaseWithDB {
             return $stmt->rowCount() > 0;
         } catch (PDOException $e) {
             error_log("PDOException deleting note: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Pins or unpins a note for a user.
+     *
+     * @param int $noteId The ID of the note to pin/unpin.
+     * @param int $userId The ID of the user who owns the note.
+     * @param bool $pinned True to pin the note, false to unpin it.
+     * @return bool True if the update was successful, false otherwise.
+     */
+    public function setNotePinnedStatus(int $noteId, int $userId, bool $pinned): bool {
+        $sql = "UPDATE saved_notes SET pinned = :pinned, updated_at = NOW()
+                WHERE id = :note_id AND user_id = :user_id";
+        try {
+            $stmt = $this->db->dbh->prepare($sql);
+            $stmt->bindValue(':pinned', $pinned ? 1 : 0, PDO::PARAM_INT);
+            $stmt->bindValue(':note_id', $noteId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->rowCount() > 0; // Check if any row was updated
+        } catch (PDOException $e) {
+            error_log("PDOException setting pinned status: " . $e->getMessage());
             return false;
         }
     }

@@ -25,6 +25,7 @@ final class Version20250502124038 extends AbstractMigration
             `user_id` INT UNSIGNED NOT NULL,
             `note_title` VARCHAR(50) NOT NULL,
             `note` TEXT NOT NULL,
+            `pinned` tinyint NOT NULL DEFAULT 0,
             `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX `idx_note_user_id` (`user_id`),

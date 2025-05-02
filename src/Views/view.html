@@ -486,19 +486,45 @@
                 notesListEl.innerHTML = '<p class="text-muted">No notes found. Create one!</p>';
                 return;
             }
+
+            // Sort notes by pinned status (pinned notes first)
+            const sortedNotes = [...notesCache].sort((a, b) => b.pinned - a.pinned);
+
             notesListEl.innerHTML = ''; // Clear previous list
-            notesCache.forEach(note => {
-                const item = document.createElement('a');
-                item.href = '#';
-                item.className = 'list-group-item list-group-item-action';
-                // Display a snippet or title if available, otherwise part of the note
-                const preview = note.note.substring(0, 100) + (note.note.length > 100 ? '...' : '');
-                item.innerHTML = `<strong>${note.note_title}</strong><br>${preview.replace(/<[^>]*>?/gm, '')}`; // Basic preview, strip HTML
+            sortedNotes.forEach(note => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
                 item.dataset.noteId = note.id;
+                item.style.cursor = 'pointer';
                 item.addEventListener('click', (e) => {
                     e.preventDefault();
                     viewNote(note.id);
                 });
+
+                // Note content preview
+                const noteContent = document.createElement('div');
+                noteContent.className = 'note-content';
+                const preview = note.note.substring(0, 100) + (note.note.length > 100 ? '...' : '');
+                noteContent.innerHTML = `<strong>${note.note_title}</strong><br>${preview.replace(/<[^>]*>?/gm, '')}`;
+
+                // Pin/Unpin button
+                const pinButton = document.createElement('button');
+                pinButton.className = 'btn btn-sm ' + (note.pinned ? 'btn-warning' : 'btn-outline-secondary');
+                pinButton.textContent = note.pinned ? 'Unpin' : 'Pin';
+                pinButton.addEventListener('click', async (e) => {
+                    e.stopPropagation(); // Prevent triggering the note view
+                    try {
+                        await apiClient.patch(`/notes/${note.id}/pin`, { pinned: !note.pinned });
+                        fetchNotes(); // Fetch the latest notes from the server
+                    } catch (error) {
+                        console.error("Failed to update pin status:", error.response?.data || error.message);
+                        alert('Failed to update pin status. Please try again.');
+                    }
+                });
+
+                // Append elements
+                item.appendChild(noteContent);
+                item.appendChild(pinButton);
                 notesListEl.appendChild(item);
             });
         }

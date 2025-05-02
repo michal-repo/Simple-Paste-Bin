@@ -434,6 +434,23 @@ $router->mount('/notes', function () use ($router) {
                 handleErr($th);
             }
         });
+
+        // OPTIONS /notes/{noteId}/pin
+        $router->options('/pin', function () {
+            handleOptionsRequest('PATCH');
+        });
+
+        // PATCH /notes/{noteId}/pin - Pin or unpin a specific note
+        $router->patch('/pin', function ($noteId) {
+            try {
+                ensureAuthenticated();
+                $controller = new SavedNoteController();
+                $controller->setPinnedStatus((int)$noteId);
+            } catch (\Throwable $th) {
+                handleErr($th);
+            }
+        });
+
     }); // End /notes/{noteId} mount
 
 

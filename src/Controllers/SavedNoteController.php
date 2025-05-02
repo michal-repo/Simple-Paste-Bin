@@ -170,4 +170,37 @@ class SavedNoteController extends BaseWithDB {
         http_response_code(204); // No Content is appropriate for successful DELETE
         // No body needed for 204 response
     }
+
+    /**
+     * Pin or unpin a note for the authenticated user.
+     * @param int $noteId
+     */
+    public function setPinnedStatus(int $noteId): void {
+        $userId = $this->apiAuth->getUserId();
+        if ($userId === null) {
+            throw new Exception("User ID not found from token.", 401);
+        }
+
+        $input = json_decode(file_get_contents("php://input"), true);
+        if (json_last_error() !== JSON_ERROR_NONE || is_null($input) || !isset($input['pinned']) || !is_bool($input['pinned'])) {
+            throw new Exception("Missing or invalid 'pinned' status in JSON body.", 400);
+        }
+
+        $pinned = $input['pinned'];
+        $success = $this->noteModel->setNotePinnedStatus($noteId, $userId, $pinned);
+
+        if (!$success) {
+            // Check if the note exists and is owned by the user
+            if (!$this->noteModel->getNoteById($noteId, $userId)) {
+                throw new Exception("Note not found or access denied.", 404);
+            }
+            throw new Exception("Failed to update pinned status.", 500);
+        }
+
+        // Fetch the updated note to return it
+        $updatedNote = $this->noteModel->getNoteById($noteId, $userId);
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['status' => ['code' => 200, 'message' => 'ok'], 'data' => $updatedNote]);
+    }
 }
