@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Simple-Paste-Bin
+
+    RewriteRule ^(data|logs|migrations|src|vendor)($|/) - [F,L]
+
+    RewriteCond %{REQUEST_URI} ^/Simple-Paste-Bin/[^/]+$
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteCond %{REQUEST_URI} !^/Simple-Paste-Bin/index\.php$
+    RewriteCond %{REQUEST_URI} !^/Simple-Paste-Bin/paste\.ico$
+    RewriteRule ^[^/]+$ - [F,L]
+
+
+    RewriteRule ^index\.php$ - [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /Simple-Paste-Bin/index.php [L]
+</IfModule>
