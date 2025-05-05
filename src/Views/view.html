@@ -653,10 +653,29 @@
             }
 
             try {
-                await apiClient[method](url, { note: content });
-                destroyTinyMCE();
-                noteModalInstance.hide();
-                fetchNotes(); // Refresh list
+                const response = await apiClient[method](url, { note: content });
+                const savedNote = response.data.data; // Assuming API returns the saved/created note object
+
+                // Update cache
+                const index = notesCache.findIndex(n => n.id === savedNote.id);
+                if (index > -1) {
+                    notesCache[index] = savedNote; // Update existing
+                } else {
+                    notesCache.push(savedNote); // Add new
+                }
+
+                // Update current state (especially important for new notes)
+                currentNoteId = savedNote.id;
+                currentNoteTitle = savedNote.note_title; // Assuming API returns title
+
+                // Update the display content immediately before switching mode
+                noteContentDisplay.innerHTML = savedNote.note;
+
+                // Switch UI back to view mode (this destroys TinyMCE and updates UI elements)
+                switchToViewMode();
+
+                // Refresh the main notes list in the background silently
+                fetchNotes();
             } catch (error) {
                 console.error("Failed to save note:", error.response?.data || error.message);
                 errorEl.textContent = error.response?.data?.status?.message || 'Failed to save note.';
@@ -749,12 +768,20 @@
         function switchToViewMode() {
             destroyTinyMCE(); // Destroy editor if it exists
             noteModalEl.classList.remove('editing', 'viewing-attachments'); // Remove state classes
-            noteModalTitle.textContent = `Note ${currentNoteTitle}`; // Reset title
-            // CSS rules will handle showing/hiding the correct areas and buttons
-            // Re-fetch attachments UI state in case attachments were added/deleted
-            if (currentNoteId) {
+
+            // Find the note data from the cache to ensure UI is up-to-date
+            const note = notesCache.find(n => n.id === currentNoteId);
+
+            if (note) {
+                currentNoteTitle = note.note_title; // Update title from cache
+                noteModalTitle.textContent = `Note ${currentNoteTitle}`; // Reset title display
+                noteContentDisplay.innerHTML = note.note; // Update content display
                 fetchAndUpdateAttachmentsUI(currentNoteId).catch(err => console.error("Error updating attachments UI on switch to view", err));
+            } else {
+                 console.error("Cannot switch to view mode: Note not found in cache for ID", currentNoteId);
+                 noteModalInstance.hide(); // Fallback if something went wrong
             }
+            // CSS rules will handle showing/hiding the correct areas and buttons
         }
 
         // --- Attachment Handling ---
