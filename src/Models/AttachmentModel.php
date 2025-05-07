@@ -15,18 +15,25 @@ class AttachmentModel extends BaseWithDB {
      * @param int $savedNoteId The ID of the saved note this attachment belongs to.
      * @param string $fileUuid The unique identifier (e.g., UUID) for the stored file.
      * @param string $fileName The original name of the uploaded file.
+     * @param bool $public_access If true, an access key will be generated for public access. Defaults to false.
      * @return int|false The ID of the newly created attachment record, or false on failure.
      * @throws Exception
      */
-    public function createAttachment(int $savedNoteId, string $fileUuid, string $fileName): int|false {
-        $sql = "INSERT INTO attachments (saved_note_id, file_uuid, file_name) VALUES (:saved_note_id, :file_uuid, :file_name)";
+    public function createAttachment(int $savedNoteId, string $fileUuid, string $fileName, bool $public_access = false): int|false {
+        $accessKey = null;
+        if ($public_access) {
+            $accessKey = bin2hex(random_bytes(64)); // Generates a 128-character hex string
+        }
+
+        $sql = "INSERT INTO attachments (saved_note_id, file_uuid, file_name, access_key) VALUES (:saved_note_id, :file_uuid, :file_name, :access_key)";
         try {
             $stmt = $this->db->dbh->prepare($sql);
             $stmt->bindValue(':saved_note_id', $savedNoteId, PDO::PARAM_INT);
             $stmt->bindValue(':file_uuid', $fileUuid, PDO::PARAM_STR);
             $stmt->bindValue(':file_name', $fileName, PDO::PARAM_STR);
+            $stmt->bindValue(':access_key', $accessKey, $accessKey === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
 
-             if ($stmt->execute()) {
+            if ($stmt->execute()) {
                 return (int)$this->db->dbh->lastInsertId();
             } else {
                 throw new Exception("Failed to create attachment record.", 500);
@@ -48,7 +55,7 @@ class AttachmentModel extends BaseWithDB {
      * @return array An array of attachments (each as an associative array including 'file_name').
      */
     public function getAttachmentsByNoteId(int $savedNoteId): array {
-        $sql = "SELECT id, file_name, file_uuid, created_at, updated_at, saved_note_id
+        $sql = "SELECT id, file_name, file_uuid, access_key, created_at, updated_at, saved_note_id
                  FROM attachments
                 WHERE saved_note_id = :saved_note_id
                 ORDER BY created_at ASC";
@@ -70,7 +77,7 @@ class AttachmentModel extends BaseWithDB {
      * @return array|false The attachment data as an associative array (including 'file_name'), or false if not found.
      */
     public function getAttachmentById(int $attachmentId): array|false {
-        $sql = "SELECT id, file_name, file_uuid, created_at, updated_at, saved_note_id
+        $sql = "SELECT id, file_name, file_uuid, access_key, created_at, updated_at, saved_note_id
                  FROM attachments
                 WHERE id = :attachment_id";
         try {

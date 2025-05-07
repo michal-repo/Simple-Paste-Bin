@@ -450,7 +450,6 @@ $router->mount('/notes', function () use ($router) {
                 handleErr($th);
             }
         });
-
     }); // End /notes/{noteId} mount
 
 
@@ -469,7 +468,9 @@ $router->mount('/attachments', function () use ($router) {
     // GET /attachments/download/{attachmentId} - Serve the attachment file for download
     $router->get('/download/{attachmentId:\d+}', function ($attachmentId) {
         try {
-            ensureAuthenticated(); // Ensure user is logged in
+            if (is_null($_GET['access-key'])) {
+                ensureAuthenticated(); // Ensure user is logged in
+            }
             $controller = new AttachmentController();
             $controller->serveAttachment((int)$attachmentId);
         } catch (\Throwable $th) {

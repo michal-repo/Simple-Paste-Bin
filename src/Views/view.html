@@ -385,6 +385,61 @@
             }
         }
 
+        // --- TinyMCE Image Upload Handler ---
+        const imageUploadHandler = (blobInfo, progress) => new Promise((resolve, reject) => {
+            if (!currentNoteId) {
+                tinymce.activeEditor.notificationManager.open({
+                    text: 'Please save the note before uploading images. Images can only be added to existing notes.',
+                    type: 'error',
+                    timeout: 5000
+                });
+                reject({ message: 'Note not saved. Please save the note first to enable image uploads.', remove: true });
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('attachment_file', blobInfo.blob(), blobInfo.filename());
+            formData.append('public_access', 'true'); // Server expects this for public images with access_key
+
+            apiClient.post(`/notes/${currentNoteId}/attachments`, formData, {
+                headers: {
+                    'Content-Type': undefined // Let Axios set the correct multipart header with boundary
+                },
+                onUploadProgress: (event) => {
+                    if (event.lengthComputable) {
+                        progress(event.loaded / event.total * 100);
+                    }
+                }
+            })
+                .then(response => {
+                    const newAttachment = response.data.data;
+                    if (newAttachment && newAttachment.id && newAttachment.access_key) {
+                        // API_BASE_URL ends with a slash, e.g., /Simple-Paste-Bin/
+                        // The download URL is relative to the domain root if API_BASE_URL is used directly.
+                        // Or, construct it carefully.
+                        // Endpoint: /attachments/download/{id}
+                        const downloadUrl = `${API_BASE_URL}attachments/download/${newAttachment.id}?access-key=${newAttachment.access_key}`;
+                        resolve(downloadUrl);
+                    } else {
+                        console.error("Upload response missing attachment ID or access key for public image:", newAttachment);
+                        reject({ message: 'Invalid server response: Missing ID or access key for image.', remove: true });
+                    }
+                })
+                .catch(error => {
+                    console.error("Image upload failed:", error.response?.data || error.message);
+                    let errorMessage = 'Image upload failed.';
+                    if (error.response?.data?.status?.message) {
+                        errorMessage = error.response.data.status.message;
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                    tinymce.activeEditor.notificationManager.open({
+                        text: `Image Upload Error: ${errorMessage}`,
+                        type: 'error'
+                    });
+                    reject({ message: `Upload Error: ${errorMessage}`, remove: true });
+                });
+        });
         // --- TinyMCE ---
         function initTinyMCE(content = '') {
             tinymce.init({
@@ -399,6 +454,9 @@
                 autosave_retention: '2m',
                 license_key: 'gpl',
                 height: 'calc(100vh - 200px)', // Adjust height to fit modal
+                automatic_uploads: true, // Enable automatic image uploads
+                images_upload_handler: imageUploadHandler, // Use our custom handler
+                paste_data_images: true, // Crucial for pasted images to be uploaded
                 setup: function (editor) {
                     editor.on('init', function () {
                         editor.setContent(content);
@@ -778,8 +836,8 @@
                 noteContentDisplay.innerHTML = note.note; // Update content display
                 fetchAndUpdateAttachmentsUI(currentNoteId).catch(err => console.error("Error updating attachments UI on switch to view", err));
             } else {
-                 console.error("Cannot switch to view mode: Note not found in cache for ID", currentNoteId);
-                 noteModalInstance.hide(); // Fallback if something went wrong
+                console.error("Cannot switch to view mode: Note not found in cache for ID", currentNoteId);
+                noteModalInstance.hide(); // Fallback if something went wrong
             }
             // CSS rules will handle showing/hiding the correct areas and buttons
         }

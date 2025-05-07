@@ -113,8 +113,12 @@ class AttachmentController extends BaseWithDB {
         }
 
         // --- Database Record Creation ---
-        // Assumes createAttachment model method now accepts ($noteId, $originalFileName, $fileUuid)
-        $newAttachmentId = $this->attachmentModel->createAttachment($noteId, $fileUuid, $originalFileName);
+        // Check for public_access flag in the request
+        $publicAccess = false;
+        if (isset($_POST['public_access'])) {
+            $publicAccess = filter_var($_POST['public_access'], FILTER_VALIDATE_BOOLEAN);
+        }
+        $newAttachmentId = $this->attachmentModel->createAttachment($noteId, $fileUuid, $originalFileName, $publicAccess);
 
 
         if ($newAttachmentId === false) {
@@ -180,22 +184,38 @@ class AttachmentController extends BaseWithDB {
 
     /**
      * Serves an attachment file for download.
-     * Verifies ownership before serving.
+     * If 'access-key' GET parameter is provided and matches, it bypasses ownership checks.
+     * Otherwise, verifies ownership before serving.
      * @param int $attachmentId
      */
     public function serveAttachment(int $attachmentId): void {
-        $userId = $this->apiAuth->getUserId();
-        if ($userId === null) {
-            throw new Exception("User ID not found from token.", 401);
-        }
+        $accessKeyFromRequest = $_GET['access-key'] ?? null;
 
         $attachment = $this->attachmentModel->getAttachmentById($attachmentId);
         if (!$attachment) {
             throw new Exception("Attachment not found.", 404);
         }
 
-        // Verify ownership of the note this attachment belongs to
-        $this->verifyNoteOwnership((int)$attachment['saved_note_id'], $userId);
+        if ($accessKeyFromRequest !== null) {
+            // Access key provided, attempt public access
+            if (empty($attachment['access_key'])) {
+                // Attachment exists but has no access key configured
+                throw new Exception("This attachment is not configured for public access.", 403);
+            }
+            if ($attachment['access_key'] !== $accessKeyFromRequest) {
+                // Access key provided but does not match
+                throw new Exception("Invalid access key.", 403);
+            }
+            // If we reach here, the access key is valid. Proceed to serve.
+        } else {
+            // No access key, proceed with standard authenticated access
+            $userId = $this->apiAuth->getUserId();
+            if ($userId === null) {
+                throw new Exception("Authentication required to access this attachment. User ID not found from token.", 401);
+            }
+            // Verify ownership of the note this attachment belongs to
+            $this->verifyNoteOwnership((int)$attachment['saved_note_id'], $userId);
+        }
 
         $filePath = $this->getUploadDir() . DIRECTORY_SEPARATOR . $attachment['file_uuid'];
         $originalFileName = $attachment['file_name'];
