@@ -835,12 +835,23 @@
                 currentNoteTitle = note.note_title; // Update title from cache
                 noteModalTitle.textContent = `Note ${currentNoteTitle}`; // Reset title display
                 noteContentDisplay.innerHTML = note.note; // Update content display
-                fetchAndUpdateAttachmentsUI(currentNoteId).catch(err => console.error("Error updating attachments UI on switch to view", err));
+                // Ensure delete and add attachment buttons are visible in view mode,
+                // as their inline styles might have been set to 'none' by openNewNoteEditor or switchToEditMode.
+                // The CSS rules will handle other buttons like edit, save, back based on modal classes.
+                if (currentNoteId) { // A note must exist (and have an ID) to be in "view" mode.
+                    deleteNoteBtn.style.display = 'inline-block';
+                    addAttachmentBtn.style.display = 'inline-block';
+                } else {
+                    // This case should ideally not be reached if switchToViewMode is called for a saved note.
+                    // If it does, hide these buttons as a fallback.
+                    deleteNoteBtn.style.display = 'none';
+                    addAttachmentBtn.style.display = 'none';
+                }
+                fetchAndUpdateAttachmentsUI(currentNoteId).catch(err => console.error("Error updating attachments UI on switch to view mode", err));
             } else {
                 console.error("Cannot switch to view mode: Note not found in cache for ID", currentNoteId);
                 noteModalInstance.hide(); // Fallback if something went wrong
             }
-            // CSS rules will handle showing/hiding the correct areas and buttons
         }
 
         // --- Attachment Handling ---
